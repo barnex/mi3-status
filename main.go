@@ -37,7 +37,7 @@ func main() {
 
 		clock.FullText = time.Now().Format("Mon 2 Jan 15:04:05 2006")
 
-		power.FullText = fmt.Sprintf("%4.2f W ", batteryWatts())
+		power.FullText = fmt.Sprintf("% 5.1f %% % 5.2f W ", batteryPct(), batteryWatts())
 
 		enc.Encode(blocks)
 		fmt.Fprintln(out, ",")
@@ -49,6 +49,12 @@ func batteryWatts() float64 {
 	microVolt := readFloat64("/sys/class/power_supply/BAT0/voltage_now")
 	microAmp := readFloat64("/sys/class/power_supply/BAT0/current_now")
 	return microVolt * microAmp / 1e12
+}
+
+func batteryPct() float64 {
+	now := readFloat64("/sys/class/power_supply/BAT0/charge_now")
+	full := readFloat64("/sys/class/power_supply/BAT0/charge_full")
+	return 100 * now / full
 }
 
 func readFloat64(file string) float64 {
