@@ -40,24 +40,25 @@ func main() {
 	power := &Block{}
 
 	blocks := []*Block{
+		&Block{}, // empty, separator
 		bat,
 		power,
 		clock,
+		&Block{}, // empty, separator
 	}
 
 	avgWatts := 0.0
 
-	for now := range time.Tick(time.Second) {
-
+	update := func(now time.Time) {
 		// clock
 		clock.FullText = now.Format(" Mon 2 Jan 15:04:05 2006 ")
 
 		// power use
 		watts := batteryWatts()
+		power.FullText = fmt.Sprintf("% 6.2f W ", watts)
 		const t = 0.95 // slow recursive filter
 		avgWatts = (t * avgWatts) + (1-t)*watts
-		power.FullText = fmt.Sprintf("% 6.2f W ", watts)
-		if avgWatts > warnWatts {
+		if avgWatts > warnWatts && batteryDischarging() {
 			power.Color = red
 		} else {
 			power.Color = ""
@@ -77,6 +78,11 @@ func main() {
 		fmt.Fprintln(out, ",")
 		out.Flush()
 	}
+
+	update(time.Now())
+	for now := range time.Tick(time.Second) {
+		update(now)
+	}
 }
 
 func batteryWatts() float64 {
@@ -91,16 +97,24 @@ func batteryPct() float64 {
 	return 100 * now / full
 }
 
+func batteryDischarging() bool {
+	return readString("/sys/class/power_supply/BAT0/voltage_now") == "Discharging"
+}
+
 func readFloat64(file string) float64 {
-	bytes, err := ioutil.ReadFile(file)
-	if err != nil {
-		log.Println(err)
-		return 0
-	}
-	str := strings.TrimSpace(string(bytes))
+	str := readString(file)
 	v, err := strconv.ParseFloat(str, 64)
 	if err != nil {
 		log.Println(err)
 	}
 	return v
+}
+
+func readString(file string) string {
+	bytes, err := ioutil.ReadFile(file)
+	if err != nil {
+		log.Println(err)
+		return ""
+	}
+	return strings.TrimSpace(string(bytes))
 }
