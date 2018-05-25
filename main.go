@@ -12,8 +12,18 @@ import (
 	"time"
 )
 
+const (
+	red = "#ff0000"
+)
+
+const (
+	warnBat   = 30 // warn when battery below this percentage
+	warnWatts = 8  // warn when over this power draw for an extended time
+)
+
 type Block struct {
 	FullText string `json:"full_text"`
+	Color    string `json:"color,omitempty"`
 }
 
 func main() {
@@ -26,19 +36,43 @@ func main() {
 	out.Flush()
 
 	clock := &Block{}
+	bat := &Block{}
 	power := &Block{}
 
 	blocks := []*Block{
+		bat,
 		power,
 		clock,
 	}
 
-	for range time.Tick(time.Second) {
+	avgWatts := 0.0
 
-		clock.FullText = time.Now().Format("Mon 2 Jan 15:04:05 2006")
+	for now := range time.Tick(time.Second) {
 
-		power.FullText = fmt.Sprintf("% 5.1f %% % 5.2f W ", batteryPct(), batteryWatts())
+		// clock
+		clock.FullText = now.Format(" Mon 2 Jan 15:04:05 2006 ")
 
+		// power use
+		watts := batteryWatts()
+		const t = 0.95 // slow recursive filter
+		avgWatts = (t * avgWatts) + (1-t)*watts
+		power.FullText = fmt.Sprintf("% 6.2f W ", watts)
+		if avgWatts > warnWatts {
+			power.Color = red
+		} else {
+			power.Color = ""
+		}
+
+		// battery capacity
+		pct := batteryPct()
+		bat.FullText = fmt.Sprintf("% 5.1f %% ", pct)
+		if pct < warnBat {
+			bat.Color = red
+		} else {
+			bat.Color = ""
+		}
+
+		// output
 		enc.Encode(blocks)
 		fmt.Fprintln(out, ",")
 		out.Flush()
