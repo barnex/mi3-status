@@ -14,7 +14,8 @@ import (
 )
 
 const (
-	red = "#ff0000"
+	red  = "#ff0000"
+	gray = "#777777"
 )
 
 var (
@@ -58,21 +59,33 @@ func main() {
 
 		// power use
 		watts := batteryWatts()
+		discharging := batteryDischarging()
 		power.FullText = fmt.Sprintf("% 6.2f W ", watts)
 		const t = 0.95 // slow recursive filter
-		avgWatts = (t * avgWatts) + (1-t)*watts
-		if *warnWatts != 0 && avgWatts > *warnWatts && batteryDischarging() {
-			power.Color = red
+		if discharging {
+			avgWatts = (t * avgWatts) + (1-t)*watts
 		} else {
+			avgWatts = 0
+		}
+
+		switch {
+		case *warnWatts != 0 && avgWatts > *warnWatts && discharging:
+			power.Color = red
+		case !discharging:
+			power.Color = gray
+		default:
 			power.Color = ""
 		}
 
 		// battery capacity
 		pct := batteryPct()
 		bat.FullText = fmt.Sprintf("% 4.0f %% ", pct)
-		if pct <= *warnBat {
+		switch {
+		case pct <= *warnBat:
 			bat.Color = red
-		} else {
+		case !discharging:
+			bat.Color = gray
+		default:
 			bat.Color = ""
 		}
 
