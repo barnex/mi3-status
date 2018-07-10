@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -16,9 +17,9 @@ const (
 	red = "#ff0000"
 )
 
-const (
-	warnBat   = 30 // warn when battery below this percentage
-	warnWatts = 8  // warn when over this power draw for an extended time
+var (
+	warnBat   = flag.Float64("warn-bat", 0, "low battery warning percentage")
+	warnWatts = flag.Float64("warn-power", 0, "high power draw warning (watts)")
 )
 
 type Block struct {
@@ -27,6 +28,8 @@ type Block struct {
 }
 
 func main() {
+
+	flag.Parse()
 
 	// init
 	out := bufio.NewWriter(os.Stdout)
@@ -58,7 +61,7 @@ func main() {
 		power.FullText = fmt.Sprintf("% 6.2f W ", watts)
 		const t = 0.95 // slow recursive filter
 		avgWatts = (t * avgWatts) + (1-t)*watts
-		if avgWatts > warnWatts && batteryDischarging() {
+		if *warnWatts != 0 && avgWatts > *warnWatts && batteryDischarging() {
 			power.Color = red
 		} else {
 			power.Color = ""
@@ -66,8 +69,8 @@ func main() {
 
 		// battery capacity
 		pct := batteryPct()
-		bat.FullText = fmt.Sprintf("% 5.1f %% ", pct)
-		if pct < warnBat {
+		bat.FullText = fmt.Sprintf("% 4.0f %% ", pct)
+		if pct <= *warnBat {
 			bat.Color = red
 		} else {
 			bat.Color = ""
@@ -92,13 +95,11 @@ func batteryWatts() float64 {
 }
 
 func batteryPct() float64 {
-	now := readFloat64("/sys/class/power_supply/BAT0/charge_now")
-	full := readFloat64("/sys/class/power_supply/BAT0/charge_full")
-	return 100 * now / full
+	return readFloat64("/sys/class/power_supply/BAT0/capacity")
 }
 
 func batteryDischarging() bool {
-	return readString("/sys/class/power_supply/BAT0/voltage_now") == "Discharging"
+	return readString("/sys/class/power_supply/BAT0/status") == "Discharging"
 }
 
 func readFloat64(file string) float64 {
