@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -19,8 +20,15 @@ const (
 )
 
 var (
-	warnBat   = flag.Float64("warn-bat", 0, "low battery warning percentage")
-	warnWatts = flag.Float64("warn-power", 0, "high power draw warning (watts)")
+	warnBat     = flag.Float64("warn-bat", 0, "low battery warning percentage")
+	warnWatts   = flag.Float64("warn-power", 0, "high power draw warning (watts)")
+	batteryPath = flag.String("battery", "/sys/class/power_supply/BAT0", "battery device")
+)
+var (
+	capacity   = "/sys/class/power_supply/BAT0/capacity"
+	currentNow = "/sys/class/power_supply/BAT0/current_now"
+	voltageNow = "/sys/class/power_supply/BAT0/voltage_now"
+	status     = "/sys/class/power_supply/BAT0/status"
 )
 
 type Block struct {
@@ -31,6 +39,10 @@ type Block struct {
 func main() {
 
 	flag.Parse()
+	capacity = path.Join(*batteryPath, "capacity")
+	currentNow = path.Join(*batteryPath, "current_now")
+	voltageNow = path.Join(*batteryPath, "voltage_now")
+	status = path.Join(*batteryPath, "status")
 
 	// init
 	out := bufio.NewWriter(os.Stdout)
@@ -102,17 +114,17 @@ func main() {
 }
 
 func batteryWatts() float64 {
-	microVolt := readFloat64("/sys/class/power_supply/BAT0/voltage_now")
-	microAmp := readFloat64("/sys/class/power_supply/BAT0/current_now")
+	microVolt := readFloat64(voltageNow)
+	microAmp := readFloat64(currentNow)
 	return microVolt * microAmp / 1e12
 }
 
 func batteryPct() float64 {
-	return readFloat64("/sys/class/power_supply/BAT0/capacity")
+	return readFloat64(capacity)
 }
 
 func batteryDischarging() bool {
-	return readString("/sys/class/power_supply/BAT0/status") == "Discharging"
+	return readString(status) == "Discharging"
 }
 
 func readFloat64(file string) float64 {
